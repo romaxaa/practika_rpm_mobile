@@ -27,7 +27,7 @@ import java.time.format.DateTimeFormatter
 private val Slate950 = Color(0xFF0F172A)
 private val Slate900 = Color(0xFF1E293B)
 private val PrimaryText = Color(0xFFE2E8F0)
-private val SecondaryText = Color(0xFF94A3B8)
+private val SecondaryText = Color(0xFFFFFFFF)
 private val CardElevation = 8.dp
 
 @Composable
@@ -47,10 +47,8 @@ fun GroupDropdown(
         OutlinedTextField(
             value = displayText,
             onValueChange = { query = it },
-            label = { Text("Выберите группу", color = PrimaryText) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Slate900),
+            label = { Text("Выберите группу") },
+            modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(
@@ -60,9 +58,7 @@ fun GroupDropdown(
                 IconButton(onClick = { expanded = !expanded }) {
                     Icon(
                         imageVector = Icons.Filled.ArrowDropDown,
-                        contentDescription = null,
-                        modifier = Modifier.rotate(if (expanded) 180f else 0f),
-                        tint = PrimaryText
+                        contentDescription = null
                     )
                 }
             }
@@ -73,11 +69,10 @@ fun GroupDropdown(
             onDismissRequest = { expanded = false },
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Slate900)
         ) {
             filteredGroups.forEach { group ->
                 DropdownMenuItem(
-                    text = { Text(group, color = PrimaryText) },
+                    text = { Text(group) },
                     onClick = {
                         onGroupSelected(group)
                         query = ""
@@ -89,6 +84,79 @@ fun GroupDropdown(
         }
     }
 }
+@Composable
+fun ScheduleListForGroup(schedule: List<ScheduleByDateDto>) {
+    LazyColumn(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+        schedule.forEach { day ->
+            // Заголовок даты
+            item {
+                Text(
+                    text = day.lessonDate,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+
+            items(day.lessons) { lesson ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    elevation = CardDefaults.cardElevation(4.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Пара ${lesson.lessonNumber} • ${lesson.time ?: ""}",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = lesson.subject ?: "",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.Black
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        if (!lesson.teacher.isNullOrEmpty()) {
+                            Text(
+                                text = lesson.teacher ?: "",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.DarkGray
+                            )
+                        }
+                        val roomInfo = listOfNotNull(
+                            lesson.classroom,
+                            lesson.building,
+                            lesson.address
+                        ).joinToString(", ")
+                        if (roomInfo.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = roomInfo,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray
+                            )
+                        }
+                        if (lesson.groupParts.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            lesson.groupParts.forEach { (_, part) ->
+                                if (part != null) {
+                                    Text(
+                                        text = "${part.subject ?: ""} — ${part.teacher ?: ""}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color.Gray
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun ScheduleScreenForGroup(groupName: String) {
@@ -96,7 +164,6 @@ fun ScheduleScreenForGroup(groupName: String) {
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    // Перезагрузка при смене группы
     LaunchedEffect(groupName) {
         loading = true
         error = null
@@ -114,14 +181,16 @@ fun ScheduleScreenForGroup(groupName: String) {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().padding(12.dp)) {
         when {
             loading -> CircularProgressIndicator()
-            error != null -> Text("Ошибка: $error")
-            else -> ScheduleList(schedule)
+            error != null -> Text("Ошибка: $error", color = Color.Red)
+            schedule.isEmpty() -> Text("Расписание пустое", color = Color.Black)
+            else -> ScheduleListForGroup(schedule) // <- новая функция
         }
     }
 }
+
 
 @Composable
 fun ScheduleScreenWithGroupSelection() {
