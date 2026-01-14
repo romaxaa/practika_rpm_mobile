@@ -4,10 +4,12 @@ import com.example.collegeschedule.data.dto.ScheduleByDateDto
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
+
 interface ScheduleApi {
-    @GET("schedule")
+
+    @GET("api/schedule/group/{groupName}")
     suspend fun getSchedule(
-        @Query("group") group: String,
+        @Path("groupName") groupName: String, // <- path parameter
         @Query("start") start: String,
         @Query("end") end: String
     ): List<ScheduleByDateDto>
