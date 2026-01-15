@@ -28,62 +28,85 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// ------------------- App Destinations -------------------
+enum class AppDestinations(
+    val label: String,
+    val icon: ImageVector
+) {
+    HOME("Расписание", Icons.Default.Home),
+    FAVORITES("Избранное", Icons.Default.Favorite),
+    PROFILE("Профиль", Icons.Default.AccountBox)
+}
 
-
+// ------------------- Main Composable -------------------
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CollegeScheduleApp() {
+
     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.HOME) }
+
+    // Глобальный список избранного (живёт пока приложение открыто)
+    val favorites = remember { mutableStateListOf<String>() }
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        text = currentDestination.label,
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                }
+                title = { Text(currentDestination.label, style = MaterialTheme.typography.titleLarge) }
             )
         },
         bottomBar = {
             NavigationBar {
-                AppDestinations.entries.forEach { destination ->
+                AppDestinations.values().forEach { destination ->
                     NavigationBarItem(
                         icon = { Icon(destination.icon, contentDescription = destination.label) },
                         label = { Text(destination.label) },
-                        selected = destination == currentDestination,
+                        selected = currentDestination == destination,
                         onClick = { currentDestination = destination }
                     )
                 }
             }
         }
     ) { innerPadding ->
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
             when (currentDestination) {
-                AppDestinations.HOME -> ScheduleScreenWithGroupSelection() // ✅ рабочий вызов
-                AppDestinations.FAVORITES -> FavoritesScreen()
+                AppDestinations.HOME -> ScheduleScreenWithGroupSelection(favorites)
+                AppDestinations.FAVORITES -> FavoritesScreen(favorites)
                 AppDestinations.PROFILE -> ProfileScreen()
             }
         }
     }
 }
 
+// ------------------- Favorites Screen -------------------
 @Composable
-fun FavoritesScreen() {
+fun FavoritesScreen(favorites: MutableList<String>) {
     Surface(modifier = Modifier.fillMaxSize()) {
-        Text(
-            text = "Избранные группы",
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(24.dp)
-        )
+        if (favorites.isEmpty()) {
+            Text(
+                text = "Нет избранных групп",
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.padding(24.dp)
+            )
+        } else {
+            Column(modifier = Modifier.padding(12.dp)) {
+                favorites.forEach { group ->
+                    Text(
+                        text = group,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
+            }
+        }
     }
 }
 
+// ------------------- Profile Screen -------------------
 @Composable
 fun ProfileScreen() {
     Surface(modifier = Modifier.fillMaxSize()) {
@@ -93,13 +116,4 @@ fun ProfileScreen() {
             modifier = Modifier.padding(24.dp)
         )
     }
-}
-
-enum class AppDestinations(
-    val label: String,
-    val icon: ImageVector
-) {
-    HOME("Расписание", Icons.Default.Home),
-    FAVORITES("Избранное", Icons.Default.Favorite),
-    PROFILE("Профиль", Icons.Default.AccountBox)
 }
