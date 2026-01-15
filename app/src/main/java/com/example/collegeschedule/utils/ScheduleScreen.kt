@@ -22,9 +22,29 @@ import com.example.collegeschedule.data.network.RetrofitInstance
 import com.example.collegeschedule.utils.getWeekDateRange
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
 
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+
+private val SoftGray = Color(0xFFF5F7FA)
+private val CardBg = Color(0xFFFFFFFF)
+private val Accent = Color(0xFF6366F1)     // индиго-фиолетовый
+private val TextPrimary = Color(0xFF1F2937)
+private val TextSecondary = Color(0xFF6B7280)
+private val DividerColor = Color(0xFFE5E7EB)
 
 // TailwindCSS slate 900–950
 private val Slate950 = Color(0xFF0F172A)
@@ -99,15 +119,32 @@ fun GroupDropdown(
 
 @Composable
 fun ScheduleListForGroup(schedule: List<ScheduleByDateDto>) {
-    LazyColumn(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+
+    // Явно задаём цвета прямо здесь → они будут иметь приоритет над глобальной темой
+    val backgroundColor = Color(0xFFF5F7FA)      // мягкий светло-серый фон
+    val cardColor       = Color(0xFFFFFFFF)      // чисто белые карточки
+    val accentColor     = Color(0xFF6366F1)      // индиго-фиолетовый акцент
+    val textPrimary     = Color(0xFF1F2937)      // тёмный текст
+    val textSecondary   = Color(0xFF6B7280)      // серый второстепенный текст
+    val dividerColor    = Color(0xFFE5E7EB)      // светлая линия-разделитель
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(backgroundColor)
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(top = 12.dp, bottom = 32.dp)
+    ) {
         schedule.forEach { day ->
-            // Заголовок даты
+
             item {
                 Text(
                     text = day.lessonDate,
-                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                    color = textPrimary,
+                    modifier = Modifier
+                        .padding(top = 20.dp, bottom = 12.dp)
                 )
             }
 
@@ -116,50 +153,91 @@ fun ScheduleListForGroup(schedule: List<ScheduleByDateDto>) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 6.dp),
-                    elevation = CardDefaults.cardElevation(4.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA))
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardColor),
+                    elevation = CardDefaults.cardElevation(
+                        defaultElevation = 2.dp,
+                        pressedElevation = 8.dp
+                    )
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Пара ${lesson.lessonNumber} • ${lesson.time ?: ""}",
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = lesson.subject ?: "",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.Black
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        if (!lesson.teacher.isNullOrEmpty()) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Номер пары + время
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Text(
-                                text = lesson.teacher ?: "",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.DarkGray
+                                text = "Пара ${lesson.lessonNumber}",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = accentColor
                             )
+
+                            if (!lesson.time.isNullOrBlank()) {
+                                Text(
+                                    text = lesson.time!!,
+                                    fontSize = 14.sp,
+                                    color = textSecondary
+                                )
+                            }
                         }
-                        val roomInfo = listOfNotNull(
+
+                        val mainSubject = lesson.subject ?: lesson.groupParts.values.firstOrNull()?.subject.orEmpty()
+
+                        Text(
+                            text = mainSubject,
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = textPrimary,
+                            lineHeight = 26.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        // Аудитория / корпус
+// Собираем основную аудиторию
+                        val mainRoom = listOfNotNull(
                             lesson.classroom,
                             lesson.building,
                             lesson.address
-                        ).joinToString(", ")
+                        ).joinToString(" • ")
+
+// Если основной информации нет, берём из подгрупп
+                        val roomInfo = if (mainRoom.isNotEmpty()) {
+                            mainRoom
+                        } else {
+                            lesson.groupParts.values.firstOrNull()?.let { part ->
+                                listOfNotNull(part.classroom, part.building, part.address).joinToString(" • ")
+                            }.orEmpty()
+                        }
+
+// Выводим только если что-то есть
                         if (roomInfo.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = roomInfo,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.Gray
+                                fontSize = 14.sp,
+                                color = accentColor,
+                                fontWeight = FontWeight.Medium
                             )
                         }
+
+
+                        // Подгруппы
                         if (lesson.groupParts.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(6.dp))
+                            Divider(color = dividerColor, thickness = 1.dp)
+
                             lesson.groupParts.forEach { (_, part) ->
                                 if (part != null) {
                                     Text(
                                         text = "${part.subject ?: ""} — ${part.teacher ?: ""}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color.Gray
+                                        fontSize = 14.sp,
+                                        color = textSecondary,
+                                        modifier = Modifier.padding(top = 4.dp)
                                     )
                                 }
                             }
@@ -167,6 +245,10 @@ fun ScheduleListForGroup(schedule: List<ScheduleByDateDto>) {
                     }
                 }
             }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(80.dp))
         }
     }
 }
@@ -198,7 +280,7 @@ fun ScheduleScreenForGroup(groupName: String, favorites: MutableList<String>) {
         when {
             loading -> CircularProgressIndicator()
             error != null -> Text("Ошибка: $error")
-            else -> com.example.collegeschedule.ui.schedule.ScheduleList(schedule)
+            else -> ScheduleListForGroup(schedule)
         }
     }
 }
@@ -207,7 +289,7 @@ fun ScheduleScreenForGroup(groupName: String, favorites: MutableList<String>) {
 @Composable
 fun ScheduleScreenWithGroupSelection(favorites: MutableList<String>) {
     var selectedGroup by remember { mutableStateOf<String?>(null) }
-    val groups = listOf("ИС-11", "ИС-12", "ПИ-21", "ПИ-22") // пример групп
+    val groups = listOf("ИС-11", "ИС-12", "ПИ-21", "ПИ-22")
 
     Column(modifier = Modifier
         .fillMaxSize()
@@ -217,7 +299,7 @@ fun ScheduleScreenWithGroupSelection(favorites: MutableList<String>) {
         GroupDropdown(
             groups = groups,
             selectedGroup = selectedGroup,
-            favorites = favorites.toSet(), // для отображения лайков
+            favorites = favorites.toSet(),
             onGroupSelected = { group ->
                 selectedGroup = group
             },
@@ -232,7 +314,6 @@ fun ScheduleScreenWithGroupSelection(favorites: MutableList<String>) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Показ расписания выбранной группы с передачей favorites
         selectedGroup?.let { group ->
             ScheduleScreenForGroup(groupName = group, favorites = favorites)
         }
