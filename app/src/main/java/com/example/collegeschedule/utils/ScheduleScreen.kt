@@ -20,6 +20,9 @@ import androidx.compose.ui.unit.dp
 import com.example.collegeschedule.data.dto.ScheduleByDateDto
 import com.example.collegeschedule.data.network.RetrofitInstance
 import com.example.collegeschedule.utils.getWeekDateRange
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
+
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -34,45 +37,53 @@ private val CardElevation = 8.dp
 fun GroupDropdown(
     groups: List<String>,
     selectedGroup: String?,
-    onGroupSelected: (String) -> Unit
+    favorites: Set<String>,
+    onGroupSelected: (String) -> Unit,
+    onToggleFavorite: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     val focusManager = LocalFocusManager.current
 
-    val displayText = if (query.isNotEmpty()) query else selectedGroup ?: ""
     val filteredGroups = groups.filter { it.contains(query, ignoreCase = true) }
+    val displayText = query.ifEmpty { selectedGroup ?: "" }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column {
         OutlinedTextField(
             value = displayText,
-            onValueChange = { query = it },
-            label = { Text("Выберите группу") },
+            onValueChange = {
+                query = it
+                expanded = true
+            },
+            label = { Text("Группа") },
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(
-                onDone = { focusManager.clearFocus() }
-            ),
             trailingIcon = {
                 IconButton(onClick = { expanded = !expanded }) {
-                    Icon(
-                        imageVector = Icons.Filled.ArrowDropDown,
-                        contentDescription = null
-                    )
+                    Icon(Icons.Filled.ArrowDropDown, null)
                 }
-            }
+            },
+            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
         )
 
-        DropdownMenu(
-            expanded = expanded && filteredGroups.isNotEmpty(),
-            onDismissRequest = { expanded = false },
-            modifier = Modifier
-                .fillMaxWidth()
-        ) {
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             filteredGroups.forEach { group ->
                 DropdownMenuItem(
-                    text = { Text(group) },
+                    text = {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(group)
+
+                            IconButton(onClick = { onToggleFavorite(group) }) {
+                                if (favorites.contains(group)) {
+                                    Icon(Icons.Filled.Favorite, null)
+                                } else {
+                                    Icon(Icons.Outlined.FavoriteBorder, null)
+                                }
+                            }
+                        }
+                    },
                     onClick = {
                         onGroupSelected(group)
                         query = ""
@@ -84,6 +95,8 @@ fun GroupDropdown(
         }
     }
 }
+
+
 @Composable
 fun ScheduleListForGroup(schedule: List<ScheduleByDateDto>) {
     LazyColumn(modifier = Modifier.fillMaxSize().padding(12.dp)) {
@@ -159,8 +172,8 @@ fun ScheduleListForGroup(schedule: List<ScheduleByDateDto>) {
 }
 
 @Composable
-fun ScheduleScreenForGroup(groupName: String) {
-    var schedule by remember { mutableStateOf<List<ScheduleByDateDto>>(emptyList()) }
+fun ScheduleScreenForGroup(groupName: String, favorites: MutableList<String>) {
+    var schedule by remember { mutableStateOf(emptyList<com.example.collegeschedule.data.dto.ScheduleByDateDto>()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -168,8 +181,8 @@ fun ScheduleScreenForGroup(groupName: String) {
         loading = true
         error = null
         try {
-            val (start, end) = getWeekDateRange()
-            schedule = RetrofitInstance.api.getSchedule(
+            val (start, end) = com.example.collegeschedule.utils.getWeekDateRange()
+            schedule = com.example.collegeschedule.data.network.RetrofitInstance.api.getSchedule(
                 groupName = groupName,
                 start = start,
                 end = end
@@ -181,37 +194,50 @@ fun ScheduleScreenForGroup(groupName: String) {
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+    Box(modifier = Modifier.fillMaxSize()) {
         when {
             loading -> CircularProgressIndicator()
-            error != null -> Text("Ошибка: $error", color = Color.Red)
-            schedule.isEmpty() -> Text("Расписание пустое", color = Color.Black)
-            else -> ScheduleListForGroup(schedule) // <- новая функция
+            error != null -> Text("Ошибка: $error")
+            else -> com.example.collegeschedule.ui.schedule.ScheduleList(schedule)
         }
     }
 }
 
 
 @Composable
-fun ScheduleScreenWithGroupSelection() {
+fun ScheduleScreenWithGroupSelection(favorites: MutableList<String>) {
     var selectedGroup by remember { mutableStateOf<String?>(null) }
-    val groups = listOf("ИС-11", "ИС-12", "ПИ-21", "ПИ-22")
+    val groups = listOf("ИС-11", "ИС-12", "ПИ-21", "ПИ-22") // пример групп
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(12.dp)
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .padding(12.dp)
     ) {
+
         GroupDropdown(
             groups = groups,
             selectedGroup = selectedGroup,
+            favorites = favorites.toSet(), // для отображения лайков
             onGroupSelected = { group ->
                 selectedGroup = group
+            },
+            onToggleFavorite = { group ->
+                if (favorites.contains(group)) {
+                    favorites.remove(group)
+                } else {
+                    favorites.add(group)
+                }
             }
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        selectedGroup?.let { ScheduleScreenForGroup(groupName = it) }
+        // Показ расписания выбранной группы с передачей favorites
+        selectedGroup?.let { group ->
+            ScheduleScreenForGroup(groupName = group, favorites = favorites)
+        }
     }
 }
+
+
+
